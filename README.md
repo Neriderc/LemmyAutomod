@@ -42,13 +42,14 @@ Other features:
     * [**4.7** Ban user if image is the same or similar](#47-ban-user-if-image-is-the-same-or-similar)
 * [Information](#information)
   * [Table descriptions](#table-descriptions)
-  * [Environment variables](#environment-variables)
-    * [List](#list)
-    * [LEMMY_AUTH_MODE environment variable](#lemmy_auth_mode-environment-variable)
+  * [Settings](#settings)
+    * [Environment variable list](#environment-variable-list)
+    * [Lemmy authentication mode](#lemmy-authentication-mode)
   * [Jobs that can be manually run](#jobs-that-can-be-manually-run)
+    * [Restoration of accidentally removed posts](#restoration-of-accidentally-removed-posts)
     * [Analyze a specific comment or post](#analyze-a-specific-comment-or-post)
     * [Reanalyze all posts since a point in time](#reanalyze-all-posts-since-a-point-in-time)
-    * [Unban user and restore content](#unban-user-and-restore-content)
+    * [Send a test notification](#send-a-test-notification)
 <!-- TOC -->
 # Prerequisites
 To use LemmyAutomod, you will need:
@@ -81,7 +82,7 @@ automod:
     volumes:
       - ./volumes/automod:/opt/database
 ```
-More information and further environment variables are detailed in [Environment variables](#environment-variables).
+More information and further environment variables are detailed in [Environment variable list](#environment-variable-list).
 
 Ensure you also add networks that allow the LemmyWebhook to access LemmyAutomod, and LemmyAutomod to access Lemmy if you've got custom networks.
 
@@ -296,55 +297,88 @@ This section contains descriptions of tables, environment variables, and jobs th
   - The only field needed is the `user_id`, but if you don't want to go looking in the db for that,
     you can simply provide the `username` and `instance` and the automod will save the `user_id` on
     its own next time it gets any report
-- `banned_images` if an image linked in a post is similar to the image_hash, the user is banned.
+- `banned_images` - if an image linked in a post is similar to the image_hash, the user is banned.
   - `image_hash` - the hash of the image to ban (see [Ban user if image is the same or similar](#47-ban-user-if-image-is-the-same-or-similar))
   - `similarity_percent` - a decimal number between 0 and 100 determining how similar the image must be - 100 means it needs to look exactly the same, 0 means that any image will match
   - `remove_all` - whether to remove all user's posts and comments if the image matches
   - `reason` - the optional reason that will be in the modlog
   - `description` - optional description of the image, only used for notification reports
+- `removal_logs` - this table holds logs of the removals the bot has actioned, and need not be manually modified.
 
-## Environment variables
+## Settings
 
-### List
+There are various settings that can be used to control the functionality of LemmyAutomod.
+
+### Environment variable list
 
 Here is a list of environment variables and their descriptions:
 
-| Environment Variable          | Description                                                                                                                                                                                                                                                           |
-|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| LEMMY_USER                    | Username for Automod Lemmy account.                                                                                                                                                                                                                                   |
-| LEMMY_INSTANCE                | Instance hostname of Automod Lemmy account.                                                                                                                                                                                                                           |
-| LEMMY_PASSWORD                | Password for Automod Lemmy account.                                                                                                                                                                                                                                   |
-| LEMMY_USERS_TO_NOTIFY         | Comma separated list of Lemmy users to message when actions are taken.                                                                                                                                                                                                |
-| APP_SECRET                    | A random 32 hex characters - you can generate this using the terminal command 'openssl rand -hex 16'.                                                                                                                                                                 |
-| REDIS_HOST                    | Service name for your redis service you would have added for LemmyWebhook.                                                                                                                                                                                            |
-| ENABLE_NEW_USERS_NOTIFICATION | Whether to receive a notification when a new user joins.                                                                                                                                                                                                              |
-| MATRIX_API_TOKEN              | Token for connecting to Matrix for posting to a Matrix chat. See [Notification setup](#3-notification-setup-optional).                                                                                                                                                |
-| MATRIX_ROOM_NAMES             | A comma-separated list of Matrix rooms you want the bot to post notifications to. See [Notification setup](#3-notification-setup-optional).                                                                                                                           |
-| USE_LEMMYVERSE_LINK_MATRIX    | Whether to use lemmyverse.link when posting links to content or users on Matrix, which is a universal link that directs users to the content on their own instance.                                                                                                   |
-| SLACK_BOT_TOKEN               | Token for connecting to Slack for posting to a Slack channel. See [Notification setup](#3-notification-setup-optional).                                                                                                                                               |
-| SLACK_CHANNELS                | A comma-separated list of Slack channels you want the bot to post notifications to. See [Notification setup](#3-notification-setup-optional).                                                                                                                         |
-| USE_LEMMYVERSE_LINK_SLACK     | Whether to use lemmyverse.link when posting links to content or users on Slack.                                                                                                                                                                                       |
-| USE_LEMMYVERSE_LINK_LEMMY     | Whether to use lemmyverse.link when posting links to content or users in Lemmy personal messages.                                                                                                                                                                     |
-| LEMMY_AUTH_MODE               | Whether to send the Lemmy authentication as part of the header, body, or both. Sending as the header prevents credentials showing in logs, but is only supported by Lemmy 0.19.0 and up. See [Lemmy Auth Mode](#lemmy_auth_mode-environment-variable) for the options |
+| Environment Variable          | Description                                                                                                                                                                                                                                                          |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| LEMMY_USER                    | Username for Automod Lemmy account.                                                                                                                                                                                                                                  |
+| LEMMY_INSTANCE                | Instance hostname of Automod Lemmy account.                                                                                                                                                                                                                          |
+| LEMMY_PASSWORD                | Password for Automod Lemmy account.                                                                                                                                                                                                                                  |
+| LEMMY_USERS_TO_NOTIFY         | Comma separated list of Lemmy users to message when actions are taken.                                                                                                                                                                                               |
+| APP_SECRET                    | A random 32 hex characters - you can generate this using the terminal command 'openssl rand -hex 16'.                                                                                                                                                                |
+| REDIS_HOST                    | Service name for your redis service you would have added for LemmyWebhook.                                                                                                                                                                                           |
+| ENABLE_NEW_USERS_NOTIFICATION | Whether to receive a notification when a new user joins.                                                                                                                                                                                                             |
+| MATRIX_API_TOKEN              | Token for connecting to Matrix for posting to a Matrix chat. See [Notification setup](#3-notification-setup-optional).                                                                                                                                               |
+| MATRIX_ROOM_NAMES             | A comma-separated list of Matrix rooms you want the bot to post notifications to. See [Notification setup](#3-notification-setup-optional).                                                                                                                          |
+| USE_LEMMYVERSE_LINK_MATRIX    | Whether to use lemmyverse.link when posting links to content or users on Matrix, which is a universal link that directs users to the content on their own instance.                                                                                                  |
+| SLACK_BOT_TOKEN               | Token for connecting to Slack for posting to a Slack channel. See [Notification setup](#3-notification-setup-optional).                                                                                                                                              |
+| SLACK_CHANNELS                | A comma-separated list of Slack channels you want the bot to post notifications to. See [Notification setup](#3-notification-setup-optional).                                                                                                                        |
+| USE_LEMMYVERSE_LINK_SLACK     | Whether to use lemmyverse.link when posting links to content or users on Slack.                                                                                                                                                                                      |
+| USE_LEMMYVERSE_LINK_LEMMY     | Whether to use lemmyverse.link when posting links to content or users in Lemmy personal messages.                                                                                                                                                                    |
+| LEMMY_AUTH_MODE               | Whether to send the Lemmy authentication as part of the header, body, or both. Sending as the header prevents credentials showing in logs, but is only supported by Lemmy 0.19.0 and up. See [Lemmy Authentication Mode](#lemmy-authentication-mode) for the options |
+| REMOVAL_LOG_VALIDITY          | The amount of time to keep logs of removals, which are used to restore posts. Default is 24 hours.                                                                                                                                                                   |
 
-### LEMMY_AUTH_MODE environment variable
 
-This environment variable controls whether to send the Lemmy authentication as part of the header, body, or both. Sending in the header prevents credentials showing in logs, but is only supported by Lemmy 0.19.0 and up.
+### Lemmy authentication mode
+
+The `LEMMY_AUTH_MODE` environment variable controls whether to send the Lemmy authentication as part of the header, body, or both. Sending in the header prevents credentials showing in logs, but is only supported by Lemmy 0.19.0 and up.
 The options are as follows:
 - `2` - send auth as part of body (supports Lemmy < 0.19)
 - `4` - send auth as a header (supports Lemmy >= 0.19)
-- `6` - send auth both as part of body and as a part of header (supports both Lemmy < 0.19 and >= 0.19)
+- `6` - send auth both as part of body and as a part of header (supports both Lemmy < 0.19 and >= 0.19).
 
 ## Jobs that can be manually run
 
-LemmyAutomod has the ability to run the checks over a specified post, comment, or user. It can reanalyze content since a certain point in time, and there are various other jobs that can be run.
+LemmyAutomod has the ability to run the checks over a specified post, comment, or user. It can reanalyze content since a certain point in time, unban a user, and there are various other jobs that can be run.
+
+### Restoration of accidentally removed posts
+
+If a genuine user is caught by a rule, they may have been banned. You should adjust the rule before attempting to rectify it, as they may just get re-banned if you try to unban them.
+
+LemmyAutomod also provides a tool to help with restoring content. By default, LemmyAutomod logs its actions for 24 hours. This means you have 24 hours to undo a ban and have removed content restored.
+
+You can do this by running the following job to unban the user and restore their posts (once you have fixed the rule causing them to be banned):  
+`docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\UnbanUserMessage --arg [username] --arg [instance]`
+
+For example:
+
+`docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\UnbanUserMessage --arg 'MyUsername' --arg 'lemmings.world'`
+
+You can change the length of time the action logs are kept by setting the environment variable `REMOVAL_LOG_VALIDITY`.
+
+You can set this to a number of hours, for example, this will keep logs for 48 hours:
+`REMOVAL_LOG_VALIDITY=48`
+
+Or you can use a PHP [DateInterval](https://www.php.net/manual/en/dateinterval.construct.php). For example, use, `P1H30M` to keep logs for one and a half hours, `P7D` to keep logs for a period of 7 days, `P1Y182D` to keep logs for approximately one and a half years.
+
+Note that if you set the log validity to `0`, then no logs are kept. In this case, if you run the above job then *all* the user's comments and posts will be restored, including posts or comments that the user themselves deleted or that moderators have removed manually.
 
 ### Analyze a specific comment or post
-To have the automod check your rules against a specific post, run:  
+To have the automod check your ban rules against a specific post, run:  
 `docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\AnalyzePostMessage --arg [post ID]`
 
-To have the automod check your rules against a specific comment, run:  
+To have the automod check your report rules against a specific post, run:  
+`docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\AnalyzePostReportMessage --arg [post ID]`
+
+To have the automod check your ban rules against a specific comment, run:  
 `docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\AnalyzeCommentMessage --arg [comment ID]`
+
+To have the automod check your report against a specific comment, run:  
+`docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\AnalyzeCommentReportMessage --arg [comment ID]`
 
 ### Reanalyze all posts since a point in time
 
@@ -354,14 +388,6 @@ You can start a job to reanalyse all posts since a certain time (including check
 For example:  
 `docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\ReanalyzePostsMessage --arg '2024-02-16T01:00:00+02:00'`
 
-### Unban user and restore content
+### Send a test notification
 
-If you have accidentally banned a user, you can unban them using the website UI, but make sure you first change the rule that banned them otherwise the user may be re-banned. If you've removed their content, you can use the following command to unban and restore content:
-
-`docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\UnbanUserMessage --arg [username] --arg [instance]`
-
-For example:
-
-`docker exec -it lemmy_automod_1 bin/console app:trigger App\\Message\\UnbanUserMessage --arg 'MyUsername' --arg 'lemmings.world'`
-
-This will unban them. It will also iterate through all posts and comments and make all their comments and posts visible again. Note this will restore all posts and comments, even if the Automod was not the one that removed them, including posts and comments that the user themselves deleted. So be careful using it.
+You can trigger a job to send a test notification for testing your notification setup. See [Test notification](#35-test-notification).
